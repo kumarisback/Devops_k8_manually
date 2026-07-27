@@ -1,0 +1,37 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-ingress
+  namespace: production
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          # Order Microservice API
+          - path: /api/orders
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-order
+                port:
+                  number: 80
+          # User Microservice API & Auth
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-user
+                port:
+                  number: 80
+          # Frontend UI
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 80

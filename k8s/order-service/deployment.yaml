@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-order
+  namespace: production
+  labels:
+    app: backend-order
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend-order
+  template:
+    metadata:
+      labels:
+        app: backend-order
+    spec:
+      serviceAccountName: backend-order-sa
+      imagePullSecrets:
+        - name: ecr-secret
+      containers:
+        - name: backend-order
+          image: 602367507570.dkr.ecr.us-east-1.amazonaws.com/myapp-order-service:latest
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /api/orders/actuator/health
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/orders/actuator/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "500m"
+              memory: "768Mi"

@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-user
+  namespace: production
+  labels:
+    app: backend-user
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend-user
+  template:
+    metadata:
+      labels:
+        app: backend-user
+    spec:
+      serviceAccountName: backend-user-sa
+      imagePullSecrets:
+        - name: ecr-secret
+      containers:
+        - name: backend-user
+          image: 602367507570.dkr.ecr.us-east-1.amazonaws.com/myapp-user-service:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ORDER_SERVICE_URL
+              value: "http://backend-order:80"
+          readinessProbe:
+            httpGet:
+              path: /api/actuator/health
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/actuator/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "500m"
+              memory: "768Mi"
