@@ -1,0 +1,56 @@
+pipeline {
+    agent any
+
+    environment {
+        AWS_REGION = 'us-east-1'
+        ECR_REGISTRY = '602367507570.dkr.ecr.us-east-1.amazonaws.com'
+        ECR_REPOSITORY = 'myapp-user-service'
+        IMAGE_TAG = "${env.GIT_COMMIT ?: 'latest'}"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build & Test') {
+            steps {
+                sh 'chmod +x gradlew'
+                sh './gradlew clean build'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh "docker build -t ${ECR_REPOSITORY}:${IMAGE_TAG} ."
+            }
+        }
+
+        stage('Push to ECR') {
+            when {
+                expression {
+                    env.GIT_BRANCH == 'origin/main' || env.BRANCH_NAME == 'main'
+                }
+            }
+            steps {
+                // Relies on the EC2 IAM instance profile for credentials
+                sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}"
+                sh "docker tag ${ECR_REPOSITORY}:${IMAGE_TAG} ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
+                sh "docker tag ${ECR_REPOSITORY}:${IMAGE_TAG} ${ECR_REGISTRY}/${ECR_REPOSITORY}:latest"
+                sh "docker push ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
+                sh "docker push ${ECR_REGISTRY}/${ECR_REPOSITORY}:latest"
+            }
+        }
+    }
+
+    post {
+        always {
+            // Clean up workspace images to prevent disk space issues on EC2
+            sh "docker rmi ${ECR_REPOSITORY}:${IMAGE_TAG} || true"
+            sh "docker rmi ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG} || true"
+            sh "docker rmi ${ECR_REGISTRY}/${ECR_REPOSITORY}:latest || true"
+        }
+    }
+}
