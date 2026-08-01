@@ -16,7 +16,7 @@ spec:
   - http:
       paths:
 
-      - path: /api/auth
+      - path: /user-service/auth
         pathType: Prefix
         backend:
           service:
@@ -24,7 +24,7 @@ spec:
             port:
               number: 80
 
-      - path: /api/tasks
+      - path: /user-service/tasks
         pathType: Prefix
         backend:
           service:
@@ -32,7 +32,7 @@ spec:
             port:
               number: 80
 
-      - path: /api/user-orders
+      - path: /order-service
         pathType: Prefix
         backend:
           service:
