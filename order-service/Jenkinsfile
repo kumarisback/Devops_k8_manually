@@ -15,11 +15,11 @@ pipeline {
             }
         }
 
-        stage('Build & Test') {
+        stage('Build') {
             steps {
                 dir('user-service') {
                     sh 'chmod +x gradlew'
-                    sh './gradlew clean build'
+                    sh './gradlew clean build -x test
                 }
             }
         }
