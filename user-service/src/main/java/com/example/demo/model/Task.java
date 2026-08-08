@@ -3,18 +3,17 @@ package com.example.demo.model;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import jakarta.persistence.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 
-@Entity
-@Table(name = "tasks")
+@Document(collection = "tasks")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class Task {
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
     private String title;
     private String description;

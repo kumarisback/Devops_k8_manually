@@ -3,27 +3,22 @@ package com.example.orderservice.model;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import jakarta.persistence.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
 
-@Entity
-@Table(name = "orders")
+@Document(collection = "orders")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class Order {
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
     
-    @Column(nullable = false)
     private String userId;
     
-    @Column(nullable = false)
     private String item;
     
-    @Column(nullable = false)
     private Double amount;
     
-    @Column(nullable = false)
     private String status;
 }
