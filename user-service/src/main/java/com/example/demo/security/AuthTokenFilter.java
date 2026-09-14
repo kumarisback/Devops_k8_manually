@@ -17,6 +17,8 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import static net.logstash.logback.argument.StructuredArguments.kv;
+
 public class AuthTokenFilter extends OncePerRequestFilter {
     @Autowired
     private JwtUtils jwtUtils;
@@ -25,6 +27,7 @@ public class AuthTokenFilter extends OncePerRequestFilter {
     private UserDetailsServiceImpl userDetailsService;
 
     private static final Logger logger = LoggerFactory.getLogger(AuthTokenFilter.class);
+    private static final Logger auditLogger = LoggerFactory.getLogger("audit.user-service.auth");
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -43,6 +46,10 @@ public class AuthTokenFilter extends OncePerRequestFilter {
             }
         } catch (Exception e) {
             logger.error("Cannot set user authentication: {}", e);
+            auditLogger.warn("auth_token_rejected {} {} {}",
+                    kv("http.method", request.getMethod()),
+                    kv("url.path", request.getServletPath()),
+                    kv("reason", e.getClass().getSimpleName()));
         }
 
         filterChain.doFilter(request, response);

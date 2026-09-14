@@ -17,14 +17,21 @@ import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import static net.logstash.logback.argument.StructuredArguments.kv;
+
 @Component
 public class AuthEntryPointJwt implements AuthenticationEntryPoint {
     private static final Logger logger = LoggerFactory.getLogger(AuthEntryPointJwt.class);
+    private static final Logger auditLogger = LoggerFactory.getLogger("audit.user-service.auth");
 
     @Override
     public void commence(HttpServletRequest request, HttpServletResponse response, AuthenticationException authException)
             throws IOException, ServletException {
         logger.error("Unauthorized error: {}", authException.getMessage());
+        auditLogger.warn("auth_access_denied {} {} {}",
+                kv("http.method", request.getMethod()),
+                kv("url.path", request.getServletPath()),
+                kv("reason", authException.getClass().getSimpleName()));
 
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
