@@ -9,16 +9,21 @@ import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Scope;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static net.logstash.logback.argument.StructuredArguments.kv;
+
 @RestController
 public class OrderController {
 
     private final Tracer tracer = GlobalOpenTelemetry.getTracer("order-service.business");
+    private static final Logger auditLogger = LoggerFactory.getLogger("audit.order-service.orders");
 
     @Autowired
     private OrderRepository orderRepository;
@@ -37,9 +42,11 @@ public class OrderController {
                 orderRepository.save(order1);
                 orderRepository.save(order2);
                 orders = orderRepository.findByUserId(userId);
+                auditLogger.info("orders_seeded {}", kv("enduser.id", userId));
             }
 
             span.setAttribute("orders.count", orders.size());
+            auditLogger.info("orders_lookup_completed {} {}", kv("enduser.id", userId), kv("orders.count", orders.size()));
 
             Map<String, Object> response = new HashMap<>();
             response.put("service", "backend-order (Order Microservice)");

@@ -12,10 +12,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+
+import static net.logstash.logback.argument.StructuredArguments.kv;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
@@ -23,6 +27,7 @@ import java.util.Optional;
 public class TaskController {
 
     private final Tracer tracer = GlobalOpenTelemetry.getTracer("user-service.business");
+    private static final Logger auditLogger = LoggerFactory.getLogger("audit.user-service.tasks");
 
     @Autowired
     private TaskRepository taskRepository;
@@ -39,6 +44,7 @@ public class TaskController {
             span.setAttribute("enduser.id", username);
             List<Task> tasks = taskRepository.findByOwnerUsername(username);
             span.setAttribute("tasks.count", tasks.size());
+            auditLogger.info("tasks_listed {} {}", kv("enduser.id", username), kv("tasks.count", tasks.size()));
             return ResponseEntity.ok(tasks);
         } catch (RuntimeException ex) {
             span.recordException(ex);
@@ -82,6 +88,10 @@ public class TaskController {
             Task savedTask = taskRepository.save(task);
             span.setAttribute("task.id", savedTask.getId());
             span.setAttribute("task.status", String.valueOf(savedTask.getStatus()));
+            auditLogger.info("task_created {} {} {}",
+                    kv("enduser.id", username),
+                    kv("task.id", savedTask.getId()),
+                    kv("task.status", savedTask.getStatus()));
             return ResponseEntity.status(HttpStatus.CREATED).body(savedTask);
         } catch (RuntimeException ex) {
             span.recordException(ex);
@@ -102,12 +112,17 @@ public class TaskController {
             Optional<Task> taskOpt = taskRepository.findById(id);
             if (taskOpt.isEmpty()) {
                 span.setAttribute("task.found", false);
+                auditLogger.warn("task_update_missing {} {}", kv("enduser.id", username), kv("task.id", id));
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Task not found");
             }
 
             Task task = taskOpt.get();
             if (!task.getOwnerUsername().equals(username)) {
                 span.setAttribute("authorization.denied", true);
+                auditLogger.warn("task_update_denied {} {} {}",
+                        kv("enduser.id", username),
+                        kv("task.id", id),
+                        kv("task.owner", task.getOwnerUsername()));
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body("You do not have access to this task");
             }
 
@@ -119,6 +134,10 @@ public class TaskController {
 
             Task updatedTask = taskRepository.save(task);
             span.setAttribute("task.status", String.valueOf(updatedTask.getStatus()));
+            auditLogger.info("task_updated {} {} {}",
+                    kv("enduser.id", username),
+                    kv("task.id", updatedTask.getId()),
+                    kv("task.status", updatedTask.getStatus()));
             return ResponseEntity.ok(updatedTask);
         } catch (RuntimeException ex) {
             span.recordException(ex);
@@ -139,16 +158,22 @@ public class TaskController {
             Optional<Task> taskOpt = taskRepository.findById(id);
             if (taskOpt.isEmpty()) {
                 span.setAttribute("task.found", false);
+                auditLogger.warn("task_delete_missing {} {}", kv("enduser.id", username), kv("task.id", id));
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Task not found");
             }
 
             Task task = taskOpt.get();
             if (!task.getOwnerUsername().equals(username)) {
                 span.setAttribute("authorization.denied", true);
+                auditLogger.warn("task_delete_denied {} {} {}",
+                        kv("enduser.id", username),
+                        kv("task.id", id),
+                        kv("task.owner", task.getOwnerUsername()));
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body("You do not have access to this task");
             }
 
             taskRepository.delete(task);
+            auditLogger.info("task_deleted {} {}", kv("enduser.id", username), kv("task.id", id));
             return ResponseEntity.ok("Task deleted successfully");
         } catch (RuntimeException ex) {
             span.recordException(ex);
