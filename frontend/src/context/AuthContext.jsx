@@ -1,4 +1,5 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
+import { traceFetch } from '../lib/tracing';
 
 const AuthContext = createContext(null);
 
@@ -21,7 +22,7 @@ export const AuthProvider = ({ children }) => {
 
     const login = async (username, password) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/auth/signin`, {
+            const response = await traceFetch(`${API_BASE_URL}/api/auth/signin`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -57,7 +58,7 @@ export const AuthProvider = ({ children }) => {
 
     const signup = async (username, password) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/auth/signup`, {
+            const response = await traceFetch(`${API_BASE_URL}/api/auth/signup`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -96,7 +97,7 @@ export const AuthProvider = ({ children }) => {
             headers['Authorization'] = `Bearer ${activeToken}`;
         }
 
-        const response = await fetch(`${API_BASE_URL}${url}`, {
+        const response = await traceFetch(`${API_BASE_URL}${url}`, {
             ...options,
             headers,
         });
