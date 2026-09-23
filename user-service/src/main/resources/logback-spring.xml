@@ -23,6 +23,7 @@
                 </threadName>
                 <mdc/>
                 <message/>
+                <arguments/>
                 <stackTrace>
                     <fieldName>exception</fieldName>
                 </stackTrace>
