@@ -1,3 +1,5 @@
+import { isSpanContextValid, SpanStatusCode, trace } from '@opentelemetry/api';
+
 const TRACE_VERSION = '00';
 const TRACE_FLAGS_SAMPLED = '01';
 
@@ -35,34 +37,54 @@ export function withTraceHeaders(headers = {}, traceContext = createTraceContext
   };
 }
 
+// Wraps an API call in a span. With the SDK running (see otel.js) the fetch
+// instrumentation adds traceparent and exports the span, so the trace is
+// complete from the browser onward. Without it (tests, tracing turned off)
+// the call still carries a generated traceparent so backend logs correlate.
 export async function traceFetch(input, options = {}) {
-  const startedAt = performance.now();
-  const traceContext = createTraceContext();
-  const headers = withTraceHeaders(options.headers, traceContext);
+  const method = (options.method || 'GET').toUpperCase();
+  const tracer = trace.getTracer('frontend');
 
-  try {
-    const response = await fetch(input, {
-      ...options,
-      headers,
-    });
+  return tracer.startActiveSpan(`${method} ${String(input)}`, async (span) => {
+    const sdkSpan = isSpanContextValid(span.spanContext());
+    const traceContext = sdkSpan
+      ? { traceId: span.spanContext().traceId, spanId: span.spanContext().spanId, sampled: true }
+      : createTraceContext();
+    const headers = sdkSpan ? { ...options.headers } : withTraceHeaders(options.headers, traceContext);
+    const startedAt = performance.now();
 
-    console.info('frontend_http_request_completed', {
-      trace_id: traceContext.traceId,
-      span_id: traceContext.spanId,
-      url: String(input),
-      status: response.status,
-      duration_ms: Math.round(performance.now() - startedAt),
-    });
+    try {
+      const response = await fetch(input, {
+        ...options,
+        headers,
+      });
+      span.setAttribute('http.response.status_code', response.status);
+      if (response.status >= 500) {
+        span.setStatus({ code: SpanStatusCode.ERROR });
+      }
 
-    return response;
-  } catch (error) {
-    console.error('frontend_http_request_failed', {
-      trace_id: traceContext.traceId,
-      span_id: traceContext.spanId,
-      url: String(input),
-      duration_ms: Math.round(performance.now() - startedAt),
-      error: error.message,
-    });
-    throw error;
-  }
+      console.info('frontend_http_request_completed', {
+        trace_id: traceContext.traceId,
+        span_id: traceContext.spanId,
+        url: String(input),
+        status: response.status,
+        duration_ms: Math.round(performance.now() - startedAt),
+      });
+
+      return response;
+    } catch (error) {
+      span.recordException(error);
+      span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+      console.error('frontend_http_request_failed', {
+        trace_id: traceContext.traceId,
+        span_id: traceContext.spanId,
+        url: String(input),
+        duration_ms: Math.round(performance.now() - startedAt),
+        error: error.message,
+      });
+      throw error;
+    } finally {
+      span.end();
+    }
+  });
 }
