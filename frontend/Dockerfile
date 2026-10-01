@@ -1,13 +1,14 @@
 # ---- Build stage ----
-FROM node:20-alpine AS build
+# Node 24 LTS (Node 20 reached end of life in April 2026).
+FROM node:24-alpine AS build
 WORKDIR /app
 
 ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
-# Copy dependency configs
+# Install exactly what package-lock.json pins.
 COPY package.json package-lock.json ./
-RUN npm install
+RUN npm ci
 
 # Copy sources and build static assets
 COPY . .
