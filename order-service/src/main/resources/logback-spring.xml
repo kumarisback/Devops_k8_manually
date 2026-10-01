@@ -1,7 +1,10 @@
 <configuration>
     <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
     <springProperty scope="context" name="serviceName" source="spring.application.name" defaultValue="order-service"/>
-    <springProperty scope="context" name="environment" source="spring.profiles.active" defaultValue="local"/>
+    <!-- DEPLOYMENT_ENVIRONMENT (set per overlay in the gitops repo) binds to
+         deployment.environment, the same value the traces carry in
+         OTEL_RESOURCE_ATTRIBUTES. spring.profiles.active did not match it. -->
+    <springProperty scope="context" name="environment" source="deployment.environment" defaultValue="local"/>
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
