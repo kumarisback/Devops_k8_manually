@@ -39,7 +39,9 @@ import static net.logstash.logback.argument.StructuredArguments.kv;
  *       /api/tasks/{id}), http.response.status_code, duration_ms,
  *       http.request.body.size when the client sent a Content-Length, and
  *       error.type when an exception escaped the application.</li>
- *   <li>http.request.body: the request payload, only when
+ *   <li>http.request.body.content: the request payload (the ECS name; a
+ *       plain http.request.body would clash with http.request.body.size in
+ *       any store that expands dotted names into objects), only when
  *       app.http-logging.request-body allows it (see HttpLoggingProperties),
  *       only for JSON bodies up to 64 KiB that the application actually read,
  *       with secret fields masked and cut to max-body-length. Response bodies
@@ -117,7 +119,7 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
             if (capture && shouldLogBody(status)) {
                 String body = maskedBody(((ContentCachingRequestWrapper) req).getContentAsByteArray());
                 if (body != null) {
-                    fields.add(kv("http.request.body", body));
+                    fields.add(kv("http.request.body.content", body));
                 }
             }
             logger.info("http_request", fields.toArray());

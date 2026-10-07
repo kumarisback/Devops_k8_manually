@@ -86,7 +86,7 @@ class RequestLoggingFilterTest {
                 .containsEntry("http.response.status_code", "201")
                 .containsKey("duration_ms")
                 .containsKey("http.request.body.size")
-                .containsEntry("http.request.body",
+                .containsEntry("http.request.body.content",
                         "{\"item\":\"book\",\"password\":\"<redacted>\",\"card\":{\"cvv\":\"<redacted>\"}}");
         assertThat(fields.keySet()).doesNotContain("http.response.body");
     }
@@ -98,9 +98,21 @@ class RequestLoggingFilterTest {
                         + "\"items\":[{\"refreshToken\":\"d\",\"qty\":2}]}"),
                 new MockHttpServletResponse(), handler(201));
 
-        assertThat(loggedFields()).containsEntry("http.request.body",
+        assertThat(loggedFields()).containsEntry("http.request.body.content",
                 "{\"newPassword\":\"<redacted>\",\"client_secret\":\"<redacted>\",\"X-Api-Key\":\"<redacted>\","
                         + "\"items\":[{\"refreshToken\":\"<redacted>\",\"qty\":2}]}");
+    }
+
+    @Test
+    void noFieldNameIsThePrefixOfAnother() throws Exception {
+        filter(HttpLoggingProperties.RequestBody.ALWAYS, 2048).doFilter(
+                jsonPost("{\"item\":\"book\"}"), new MockHttpServletResponse(), handler(201));
+
+        // Stores that expand dotted names into objects (Elasticsearch,
+        // OpenSearch) can't hold a field that is both a value and a parent.
+        var names = loggedFields().keySet();
+        assertThat(names).allSatisfy(name ->
+                assertThat(names).noneMatch(other -> other.startsWith(name + ".")));
     }
 
     @Test
@@ -108,7 +120,7 @@ class RequestLoggingFilterTest {
         filter(HttpLoggingProperties.RequestBody.NEVER, 2048).doFilter(
                 jsonPost("{\"item\":\"book\"}"), new MockHttpServletResponse(), handler(201));
 
-        assertThat(loggedFields()).doesNotContainKey("http.request.body")
+        assertThat(loggedFields()).doesNotContainKey("http.request.body.content")
                 .containsEntry("http.response.status_code", "201");
     }
 
@@ -117,11 +129,11 @@ class RequestLoggingFilterTest {
         RequestLoggingFilter filter = filter(HttpLoggingProperties.RequestBody.ERRORS, 2048);
 
         filter.doFilter(jsonPost("{\"item\":\"book\"}"), new MockHttpServletResponse(), handler(200));
-        assertThat(loggedFields()).doesNotContainKey("http.request.body");
+        assertThat(loggedFields()).doesNotContainKey("http.request.body.content");
 
         appender.list.clear();
         filter.doFilter(jsonPost("{\"item\":\"book\"}"), new MockHttpServletResponse(), handler(500));
-        assertThat(loggedFields()).containsEntry("http.request.body", "{\"item\":\"book\"}");
+        assertThat(loggedFields()).containsEntry("http.request.body.content", "{\"item\":\"book\"}");
     }
 
     @Test
@@ -129,7 +141,7 @@ class RequestLoggingFilterTest {
         filter(HttpLoggingProperties.RequestBody.ALWAYS, 20).doFilter(
                 jsonPost("{\"note\":\"" + "x".repeat(100) + "\"}"), new MockHttpServletResponse(), handler(201));
 
-        String body = loggedFields().get("http.request.body");
+        String body = loggedFields().get("http.request.body.content");
         assertThat(body).hasSize(20 + RequestLoggingFilter.TRUNCATED.length())
                 .endsWith(RequestLoggingFilter.TRUNCATED);
     }
@@ -140,7 +152,7 @@ class RequestLoggingFilterTest {
                 jsonPost("{\"note\":\"" + "x".repeat(RequestLoggingFilter.MAX_CAPTURE_BYTES) + "\"}"),
                 new MockHttpServletResponse(), handler(201));
 
-        assertThat(loggedFields()).doesNotContainKey("http.request.body")
+        assertThat(loggedFields()).doesNotContainKey("http.request.body.content")
                 .containsEntry("http.request.body.size", String.valueOf(RequestLoggingFilter.MAX_CAPTURE_BYTES + 11));
     }
 
@@ -156,7 +168,7 @@ class RequestLoggingFilterTest {
                 .isInstanceOf(IllegalStateException.class);
         assertThat(loggedFields()).containsEntry("http.response.status_code", "500")
                 .containsEntry("error.type", "java.lang.IllegalStateException")
-                .containsEntry("http.request.body", "{\"item\":\"book\"}");
+                .containsEntry("http.request.body.content", "{\"item\":\"book\"}");
     }
 
     @Test
@@ -166,7 +178,7 @@ class RequestLoggingFilterTest {
         filter(HttpLoggingProperties.RequestBody.ALWAYS, 2048).doFilter(
                 request, new MockHttpServletResponse(), handler(201));
 
-        assertThat(loggedFields()).doesNotContainKey("http.request.body");
+        assertThat(loggedFields()).doesNotContainKey("http.request.body.content");
     }
 
     @Test
