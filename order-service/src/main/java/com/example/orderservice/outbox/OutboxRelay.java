@@ -128,7 +128,9 @@ public class OutboxRelay {
                 Thread.currentThread().interrupt();
             }
             int attempts = event.getAttempts() + 1;
-            Duration backoff = Duration.ofSeconds(1L << Math.min(attempts, 8));
+            // 2s, 4s, ... 256s, then the 5-minute cap (the shift is bounded
+            // so it can't overflow).
+            Duration backoff = Duration.ofSeconds(1L << Math.min(attempts, 9));
             backoff = backoff.compareTo(MAX_BACKOFF) > 0 ? MAX_BACKOFF : backoff;
             mongo.updateFirst(byId(event), new Update().set("attempts", attempts).set("nextAttemptAt", Instant.now(clock).plus(backoff))
                     .set("lastError", String.valueOf(e.getMessage())).unset("lockedUntil"), OutboxEvent.class);
