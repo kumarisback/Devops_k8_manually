@@ -34,6 +34,7 @@ WHAT THIS SCRIPT DOES:
       order-service-pipeline
       user-service-pipeline
       notification-service-pipeline
+      kafka-connect-pipeline
 
 3. Configures each Pipeline to load its Jenkinsfile directly from GitHub.
 
@@ -110,6 +111,13 @@ def jobsToCreate = [
         repoUrl: 'https://github.com/kumarisback/Devops_k8_manually.git',
         branch: '*/main',
         scriptPath: 'notification-service/Jenkinsfile'
+    ],
+
+    [
+        name: 'kafka-connect-pipeline',
+        repoUrl: 'https://github.com/kumarisback/Devops_k8_manually.git',
+        branch: '*/main',
+        scriptPath: 'kafka-connect/Jenkinsfile'
     ]
 ]
 

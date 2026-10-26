@@ -7,7 +7,7 @@ pipeline {
     }
 
     parameters {
-        choice(name: 'SERVICE', choices: ['frontend', 'user-service', 'order-service', 'notification-service'], description: 'Select the service to build')
+        choice(name: 'SERVICE', choices: ['frontend', 'user-service', 'order-service', 'notification-service', 'kafka-connect'], description: 'Select the service to build')
         booleanParam(name: 'PUSH_TO_ECR', defaultValue: false, description: 'Push Docker image to ECR after build')
         string(name: 'BACKEND_URL', defaultValue: '', description: 'Frontend API base URL for the frontend build')
     }
@@ -46,6 +46,8 @@ pipeline {
                             sh 'chmod +x gradlew'
                             sh './gradlew clean build -x test'
                         }
+                    } else if (params.SERVICE == 'kafka-connect') {
+                        echo 'Nothing to compile: the image is a connector plugin on top of Strimzi\'s Kafka image'
                     } else {
                         error "Unsupported service: ${params.SERVICE}"
                     }
