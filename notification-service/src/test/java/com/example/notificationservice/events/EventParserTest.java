@@ -89,6 +89,14 @@ class EventParserTest {
     }
 
     @Test
+    void aCorruptBodyWithAValidSchemaIdIsPermanentNotRetried() {
+        byte[] good = serialize(SCOPE, "users", userRegistered("e-8", "u-1", "asha"));
+        byte[] truncated = java.util.Arrays.copyOf(good, 8);
+
+        assertThatThrownBy(() -> parser.parse("users", truncated)).isInstanceOf(PermanentEventException.class);
+    }
+
+    @Test
     void anUnreachableRegistryIsWorthRetrying() {
         EventParser cut = new EventParser(new NotificationProperties(List.of("orders"), "http://127.0.0.1:1",
                 new NotificationProperties.Retry(Duration.ofSeconds(1), 2, 4), 0));

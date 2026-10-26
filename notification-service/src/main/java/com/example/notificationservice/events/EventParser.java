@@ -1,6 +1,7 @@
 package com.example.notificationservice.events;
 
 import com.example.notificationservice.NotificationProperties;
+import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException;
 import io.confluent.kafka.serializers.KafkaAvroDeserializer;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
@@ -8,7 +9,10 @@ import org.apache.kafka.common.errors.SerializationException;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.stereotype.Component;
 
-import java.io.IOException;
+import java.net.ConnectException;
+import java.net.NoRouteToHostException;
+import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
 import java.util.Map;
 
 /**
@@ -21,8 +25,8 @@ import java.util.Map;
  *
  * A record that isn't a registered Avro record, an unknown event type or a
  * missing field is a {@link PermanentEventException} (dead-lettered at once);
- * a registry it can't reach is a {@link SchemaRegistryUnavailableException}
- * (retried). Every field is treated as untrusted input, whoever the producer
+ * a registry it can't reach, or that answers with a server error, is a
+ * {@link SchemaRegistryUnavailableException} (retried). Every field is treated as untrusted input, whoever the producer
  * was.
  */
 @Component
@@ -48,7 +52,7 @@ public class EventParser implements DisposableBean {
             }
             event = generic;
         } catch (SerializationException e) {
-            if (causedBy(e, IOException.class)) {
+            if (registryUnavailable(e)) {
                 throw new SchemaRegistryUnavailableException(e);
             }
             throw new PermanentEventException("value is not an Avro record with a registered schema", e);
@@ -86,9 +90,16 @@ public class EventParser implements DisposableBean {
         return text.toString();
     }
 
-    private static boolean causedBy(Throwable e, Class<? extends Throwable> type) {
+    // Only a registry that can't be reached, or answers with a server error,
+    // is worth retrying. A decoding failure is an IOException too (a truncated
+    // body is an EOFException), but retrying a corrupt record can't help.
+    private static boolean registryUnavailable(Throwable e) {
         for (Throwable cause = e; cause != null; cause = cause.getCause() == cause ? null : cause.getCause()) {
-            if (type.isInstance(cause)) {
+            if (cause instanceof ConnectException || cause instanceof SocketTimeoutException
+                    || cause instanceof UnknownHostException || cause instanceof NoRouteToHostException) {
+                return true;
+            }
+            if (cause instanceof RestClientException rest && rest.getStatus() >= 500) {
                 return true;
             }
         }
