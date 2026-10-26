@@ -36,8 +36,8 @@ public class EventListener {
     }
 
     @KafkaListener(topics = "#{'${app.notifications.topics}'.split(',')}")
-    public void onEvent(ConsumerRecord<String, String> record) {
-        IncomingEvent event = parser.parse(record.value());
+    public void onEvent(ConsumerRecord<String, byte[]> record) {
+        IncomingEvent event = parser.parse(record.topic(), record.value());
         if (recentEvents.handled(event.eventId())) {
             log.info("event_duplicate_skipped {} {}", kv("event.id", event.eventId()), kv("messaging.destination.name", record.topic()));
             sent(event.type(), "duplicate").increment();

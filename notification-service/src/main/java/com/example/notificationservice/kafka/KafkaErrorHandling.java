@@ -22,8 +22,9 @@ import static net.logstash.logback.argument.StructuredArguments.kv;
  * in place with exponential backoff (1s, 2s, 4s by default); a permanent one,
  * or one still failing after the last attempt, is published to
  * {@code <topic>-dlq} with the exception in its headers, and the offset moves
- * on so the partition isn't blocked behind it. The dead-letter topics are
- * watched by an alert; their records can be inspected and replayed.
+ * on so the partition isn't blocked behind it. The record is parked byte for
+ * byte as it arrived (values are read as raw bytes), so it can be replayed
+ * exactly. The dead-letter topics are watched by an alert.
  *
  * Retrying in place holds up the rest of the partition for those seconds.
  * Spring's non-blocking retry topics avoid that at the cost of reordering;
@@ -35,7 +36,7 @@ public class KafkaErrorHandling {
     private static final Logger log = LoggerFactory.getLogger(KafkaErrorHandling.class);
 
     @Bean
-    DefaultErrorHandler kafkaErrorHandler(KafkaOperations<String, String> template, NotificationProperties properties,
+    DefaultErrorHandler kafkaErrorHandler(KafkaOperations<String, byte[]> template, NotificationProperties properties,
                                           MeterRegistry registry) {
         // Partition -1: Kafka picks one, so a dead-letter topic doesn't need
         // as many partitions as its source.

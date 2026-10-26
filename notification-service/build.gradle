@@ -15,6 +15,8 @@ java {
 
 repositories {
 	mavenCentral()
+	// The Avro deserializer that talks to the schema registry (Apache 2.0).
+	maven { url = uri('https://packages.confluent.io/maven/') }
 }
 
 dependencies {
@@ -23,6 +25,8 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
 	implementation 'org.springframework.kafka:spring-kafka'
+	// 7.8.x: the line built against kafka-clients 3.8 (Spring Boot 3.4's).
+	implementation 'io.confluent:kafka-avro-serializer:7.8.9'
 	runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
 	implementation 'net.logstash.logback:logstash-logback-encoder:8.0'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
