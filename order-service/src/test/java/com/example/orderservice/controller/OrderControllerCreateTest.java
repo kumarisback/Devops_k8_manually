@@ -3,66 +3,106 @@ package com.example.orderservice.controller;
 import com.example.orderservice.events.OrderEventPublisher;
 import com.example.orderservice.model.Order;
 import com.example.orderservice.repository.OrderRepository;
-import com.example.orderservice.web.GlobalExceptionHandler;
-import org.junit.jupiter.api.BeforeEach;
+import com.example.orderservice.security.SecurityConfig;
+import com.example.orderservice.web.HttpLoggingConfig;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@ExtendWith(MockitoExtension.class)
+/** The order API with its real security rules: who may create and read which orders. */
+@WebMvcTest(OrderController.class)
+@Import({SecurityConfig.class, HttpLoggingConfig.class})
 class OrderControllerCreateTest {
 
-    @Mock
-    private OrderRepository repository;
-
-    @Mock
-    private OrderEventPublisher publisher;
-
-    @InjectMocks
-    private OrderController controller;
-
+    @Autowired
     private MockMvc mvc;
 
-    @BeforeEach
-    void setUp() {
-        mvc = MockMvcBuilders.standaloneSetup(controller).setControllerAdvice(new GlobalExceptionHandler()).build();
-    }
+    @MockitoBean
+    private OrderRepository repository;
+
+    @MockitoBean
+    private OrderEventPublisher publisher;
 
     @Test
-    void aValidOrderIsSavedAndAnnounced() throws Exception {
-        Order saved = new Order("o-1", "u-1", "Kafka book", 42.5, "CREATED");
-        when(repository.save(any(Order.class))).thenReturn(saved);
+    void aSignedInUserCreatesAnOrderForThemselves() throws Exception {
+        when(repository.save(any(Order.class))).thenAnswer(call -> {
+            Order order = call.getArgument(0);
+            order.setId("o-1");
+            return order;
+        });
 
-        mvc.perform(post("/").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/").with(jwt().jwt(token -> token.subject("asha")))
+                        .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"userId":"u-1","item":"Kafka book","amount":42.5}"""))
+                                {"item":"Kafka book","amount":42.5,"userId":"someone-else"}"""))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value("o-1"))
+                .andExpect(jsonPath("$.userId").value("asha"))
                 .andExpect(jsonPath("$.status").value("CREATED"));
 
-        verify(publisher).orderCreated(saved);
+        ArgumentCaptor<Order> announced = ArgumentCaptor.forClass(Order.class);
+        verify(publisher).orderCreated(announced.capture());
+        assertThat(announced.getValue().getUserId()).isEqualTo("asha");
     }
 
     @Test
-    void anInvalidOrderIsRejectedAndNothingHappens() throws Exception {
+    void withoutATokenNothingHappens() throws Exception {
         mvc.perform(post("/").contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"userId":"","item":"Kafka book","amount":-1}"""))
+                                {"item":"Kafka book","amount":42.5}"""))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(repository, publisher);
+    }
+
+    @Test
+    void anInvalidOrderIsRejected() throws Exception {
+        mvc.perform(post("/").with(jwt().jwt(token -> token.subject("asha")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"item":"Kafka book\\nYour account is locked","amount":-1}"""))
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(repository, publisher);
+    }
+
+    @Test
+    void nobodyReadsSomeoneElsesOrders() throws Exception {
+        mvc.perform(get("/user/ravi").with(jwt().jwt(token -> token.subject("asha"))))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(repository);
+    }
+
+    @Test
+    void aUserReadsTheirOwnOrders() throws Exception {
+        when(repository.findByUserId("asha")).thenReturn(List.of(new Order("o-1", "asha", "book", 1.0, "CREATED")));
+
+        mvc.perform(get("/user/asha").with(jwt().jwt(token -> token.subject("asha"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalOrders").value(1));
+    }
+
+    @Test
+    void theStatusCheckIsOpen() throws Exception {
+        mvc.perform(get("/status")).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("ONLINE"));
     }
 }

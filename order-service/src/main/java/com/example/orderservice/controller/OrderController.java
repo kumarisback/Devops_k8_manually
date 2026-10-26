@@ -13,6 +13,8 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
@@ -35,14 +37,16 @@ public class OrderController {
     @Autowired
     private OrderEventPublisher eventPublisher;
 
-    // POST /api/orders. The order is saved, then an OrderCreated event goes to
-    // Kafka (where the environment has it) for notification-service.
+    // POST /api/orders, for the signed-in user (the token's subject). The order
+    // is saved, then an OrderCreated event goes to Kafka (where the environment
+    // has it) for notification-service.
     @PostMapping({"", "/"})
-    public ResponseEntity<Order> createOrder(@Valid @RequestBody CreateOrderRequest request) {
+    public ResponseEntity<Order> createOrder(@AuthenticationPrincipal Jwt token, @Valid @RequestBody CreateOrderRequest request) {
         Span span = tracer.spanBuilder("orders.create").startSpan();
         try (Scope ignored = span.makeCurrent()) {
-            span.setAttribute("enduser.id", request.userId());
-            Order order = orderRepository.save(new Order(null, request.userId(), request.item(), request.amount(), "CREATED"));
+            String userId = token.getSubject();
+            span.setAttribute("enduser.id", userId);
+            Order order = orderRepository.save(new Order(null, userId, request.item(), request.amount(), "CREATED"));
             span.setAttribute("order.id", order.getId());
             eventPublisher.orderCreated(order);
             auditLogger.info("order_created {} {}", kv("enduser.id", order.getUserId()), kv("order.id", order.getId()));
@@ -56,8 +60,13 @@ public class OrderController {
         }
     }
 
+    // A user's orders, for that user only: anyone else's token is a 403.
     @GetMapping("/user/{userId}")
-    public ResponseEntity<?> getOrdersByUserId(@PathVariable String userId) {
+    public ResponseEntity<?> getOrdersByUserId(@AuthenticationPrincipal Jwt token, @PathVariable String userId) {
+        if (!userId.equals(token.getSubject())) {
+            auditLogger.warn("orders_lookup_denied {} {}", kv("enduser.id", token.getSubject()), kv("orders.owner", userId));
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "forbidden", "message", "Access denied"));
+        }
         Span span = tracer.spanBuilder("orders.lookup_by_user").startSpan();
         try (Scope ignored = span.makeCurrent()) {
             span.setAttribute("enduser.id", userId);
