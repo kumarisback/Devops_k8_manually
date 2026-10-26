@@ -4,6 +4,7 @@ import com.example.demo.dto.JwtResponse;
 import com.example.demo.dto.LoginRequest;
 import com.example.demo.dto.MessageResponse;
 import com.example.demo.dto.SignupRequest;
+import com.example.demo.events.UserEventPublisher;
 import com.example.demo.model.Role;
 import com.example.demo.model.User;
 import com.example.demo.repository.UserRepository;
@@ -46,6 +47,9 @@ public class AuthController {
 
     @Autowired
     JwtUtils jwtUtils;
+
+    @Autowired
+    UserEventPublisher eventPublisher;
 
     @PostMapping("/signin")
     public ResponseEntity<?> authenticateUser(@RequestBody LoginRequest loginRequest) {
@@ -107,6 +111,7 @@ public class AuthController {
 
         user.setRoles(roles);
         userRepository.save(user);
+        eventPublisher.userRegistered(user);
         auditLogger.info("auth_signup_succeeded {} {}", kv("enduser.id", user.getUsername()), kv("roles", roles));
 
         return ResponseEntity.ok(new MessageResponse("User registered successfully!"));
