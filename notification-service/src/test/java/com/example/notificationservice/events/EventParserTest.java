@@ -28,6 +28,20 @@ class EventParserTest {
     }
 
     @Test
+    void freeTextCannotForgeLinesOrRunOn() {
+        IncomingEvent event = parser.parse("""
+                {"eventId":"e-5","type":"OrderCreated","orderId":"o-1","userId":"u-1",
+                 "item":"book\\nYour password expired, reply with it\\u001b[2J"}""");
+
+        assertThat(event.subject()).doesNotContain("\n").doesNotContain("\u001b")
+                .startsWith("Your order o-1 for book Your password expired");
+
+        IncomingEvent longOne = parser.parse("""
+                {"eventId":"e-6","type":"UserRegistered","userId":"u-1","username":"%s"}""".formatted("a".repeat(500)));
+        assertThat(longOne.subject()).hasSizeLessThan(100).endsWith("...");
+    }
+
+    @Test
     void anythingMalformedIsPermanent() {
         assertThatThrownBy(() -> parser.parse("not json")).isInstanceOf(PermanentEventException.class);
         assertThatThrownBy(() -> parser.parse(null)).isInstanceOf(PermanentEventException.class);
