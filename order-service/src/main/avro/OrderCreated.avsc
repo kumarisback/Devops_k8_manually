@@ -1,0 +1,15 @@
+{
+  "type": "record",
+  "name": "OrderCreated",
+  "namespace": "com.example.events.orders",
+  "doc": "An order was created. Published by order-service to topic orders, keyed by orderId. Change it only backward-compatibly (the schema registry and OrderCreatedSchemaTest enforce it): a new field needs a default; never remove a field that has no default, rename one, or change its type.",
+  "fields": [
+    {"name": "eventId", "type": "string", "doc": "Unique per event; a redelivered event keeps it."},
+    {"name": "occurredAt", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "orderId", "type": "string"},
+    {"name": "userId", "type": "string"},
+    {"name": "item", "type": "string"},
+    {"name": "amount", "type": "double"},
+    {"name": "status", "type": "string", "default": "CREATED"}
+  ]
+}

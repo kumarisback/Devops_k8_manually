@@ -1,12 +1,11 @@
 package com.example.orderservice.controller;
 
-import com.example.orderservice.events.OrderEventPublisher;
 import com.example.orderservice.model.Order;
+import com.example.orderservice.outbox.OrderCreation;
 import com.example.orderservice.repository.OrderRepository;
 import com.example.orderservice.security.SecurityConfig;
 import com.example.orderservice.web.HttpLoggingConfig;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -16,8 +15,6 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -39,15 +36,11 @@ class OrderControllerCreateTest {
     private OrderRepository repository;
 
     @MockitoBean
-    private OrderEventPublisher publisher;
+    private OrderCreation orderCreation;
 
     @Test
     void aSignedInUserCreatesAnOrderForThemselves() throws Exception {
-        when(repository.save(any(Order.class))).thenAnswer(call -> {
-            Order order = call.getArgument(0);
-            order.setId("o-1");
-            return order;
-        });
+        when(orderCreation.create("asha", "Kafka book", 42.5)).thenReturn(new Order("o-1", "asha", "Kafka book", 42.5, "CREATED"));
 
         mvc.perform(post("/").with(jwt().jwt(token -> token.subject("asha")))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -58,9 +51,8 @@ class OrderControllerCreateTest {
                 .andExpect(jsonPath("$.userId").value("asha"))
                 .andExpect(jsonPath("$.status").value("CREATED"));
 
-        ArgumentCaptor<Order> announced = ArgumentCaptor.forClass(Order.class);
-        verify(publisher).orderCreated(announced.capture());
-        assertThat(announced.getValue().getUserId()).isEqualTo("asha");
+        // The user comes from the token; the body's userId is ignored.
+        verify(orderCreation).create("asha", "Kafka book", 42.5);
     }
 
     @Test
@@ -70,7 +62,7 @@ class OrderControllerCreateTest {
                                 {"item":"Kafka book","amount":42.5}"""))
                 .andExpect(status().isUnauthorized());
 
-        verifyNoInteractions(repository, publisher);
+        verifyNoInteractions(repository, orderCreation);
     }
 
     @Test
@@ -81,7 +73,7 @@ class OrderControllerCreateTest {
                                 {"item":"Kafka book\\nYour account is locked","amount":-1}"""))
                 .andExpect(status().isBadRequest());
 
-        verifyNoInteractions(repository, publisher);
+        verifyNoInteractions(repository, orderCreation);
     }
 
     @Test

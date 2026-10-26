@@ -1,8 +1,8 @@
 package com.example.orderservice.controller;
 
 import com.example.orderservice.dto.CreateOrderRequest;
-import com.example.orderservice.events.OrderEventPublisher;
 import com.example.orderservice.model.Order;
+import com.example.orderservice.outbox.OrderCreation;
 import com.example.orderservice.repository.OrderRepository;
 import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.trace.Span;
@@ -35,20 +35,19 @@ public class OrderController {
     private OrderRepository orderRepository;
 
     @Autowired
-    private OrderEventPublisher eventPublisher;
+    private OrderCreation orderCreation;
 
-    // POST /api/orders, for the signed-in user (the token's subject). The order
-    // is saved, then an OrderCreated event goes to Kafka (where the environment
-    // has it) for notification-service.
+    // POST /api/orders, for the signed-in user (the token's subject). Where the
+    // environment runs Kafka, the OrderCreated event is stored with the order
+    // in one transaction and published afterwards (outbox).
     @PostMapping({"", "/"})
     public ResponseEntity<Order> createOrder(@AuthenticationPrincipal Jwt token, @Valid @RequestBody CreateOrderRequest request) {
         Span span = tracer.spanBuilder("orders.create").startSpan();
         try (Scope ignored = span.makeCurrent()) {
             String userId = token.getSubject();
             span.setAttribute("enduser.id", userId);
-            Order order = orderRepository.save(new Order(null, userId, request.item(), request.amount(), "CREATED"));
+            Order order = orderCreation.create(userId, request.item(), request.amount());
             span.setAttribute("order.id", order.getId());
-            eventPublisher.orderCreated(order);
             auditLogger.info("order_created {} {}", kv("enduser.id", order.getUserId()), kv("order.id", order.getId()));
             return ResponseEntity.status(HttpStatus.CREATED).body(order);
         } catch (RuntimeException ex) {
