@@ -15,13 +15,20 @@ pipeline {
     environment {
         AWS_REGION = 'us-east-1'
         ECR_REGISTRY = '602367507570.dkr.ecr.us-east-1.amazonaws.com'
-        IMAGE_TAG = "${env.GIT_COMMIT ?: 'latest'}"
+        IMAGE_TAG = "${env.GIT_COMMIT}"
     }
 
     stages {
         stage('Checkout') {
             steps {
                 checkout scm
+                script {
+                    // The image tag is the commit SHA, the tag gitops pins
+                    // (ECR tags are immutable, so it can't be overwritten).
+                    if (!(env.IMAGE_TAG ==~ /[0-9a-f]{40}/)) {
+                        error "IMAGE_TAG '${env.IMAGE_TAG}' is not a commit SHA"
+                    }
+                }
             }
         }
 
@@ -70,13 +77,11 @@ pipeline {
             }
             steps {
                 script {
-                    def repository = params.SERVICE == 'frontend' ? 'myapp-frontend' : params.SERVICE == 'user-service' ? 'myapp-user-service' : 'myapp-order-service'
+                    def repository = params.SERVICE  // ECR repositories are named after the services (tf shared-services)
                     dir(params.SERVICE) {
                         sh "aws ecr get-login-password --region ${env.AWS_REGION} | docker login --username AWS --password-stdin ${env.ECR_REGISTRY}"
                         sh "docker tag ${params.SERVICE}:${env.IMAGE_TAG} ${env.ECR_REGISTRY}/${repository}:${env.IMAGE_TAG}"
-                        sh "docker tag ${params.SERVICE}:${env.IMAGE_TAG} ${env.ECR_REGISTRY}/${repository}:latest"
                         sh "docker push ${env.ECR_REGISTRY}/${repository}:${env.IMAGE_TAG}"
-                        sh "docker push ${env.ECR_REGISTRY}/${repository}:latest"
                     }
                 }
             }
@@ -86,11 +91,10 @@ pipeline {
     post {
         always {
             script {
-                def repository = params.SERVICE == 'frontend' ? 'myapp-frontend' : params.SERVICE == 'user-service' ? 'myapp-user-service' : 'myapp-order-service'
+                def repository = params.SERVICE  // ECR repositories are named after the services (tf shared-services)
                 dir(params.SERVICE) {
                     sh "docker rmi ${params.SERVICE}:${env.IMAGE_TAG} || true"
                     sh "docker rmi ${env.ECR_REGISTRY}/${repository}:${env.IMAGE_TAG} || true"
-                    sh "docker rmi ${env.ECR_REGISTRY}/${repository}:latest || true"
                 }
             }
         }
