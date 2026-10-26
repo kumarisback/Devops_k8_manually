@@ -7,7 +7,7 @@ pipeline {
     }
 
     parameters {
-        choice(name: 'SERVICE', choices: ['frontend', 'user-service', 'order-service'], description: 'Select the service to build')
+        choice(name: 'SERVICE', choices: ['frontend', 'user-service', 'order-service', 'notification-service'], description: 'Select the service to build')
         booleanParam(name: 'PUSH_TO_ECR', defaultValue: false, description: 'Push Docker image to ECR after build')
         string(name: 'BACKEND_URL', defaultValue: '', description: 'Frontend API base URL for the frontend build')
     }
@@ -41,7 +41,7 @@ pipeline {
                             sh 'npm run lint'
                             sh 'npm run build'
                         }
-                    } else if (params.SERVICE == 'user-service' || params.SERVICE == 'order-service') {
+                    } else if (params.SERVICE in ['user-service', 'order-service', 'notification-service']) {
                         dir(params.SERVICE) {
                             sh 'chmod +x gradlew'
                             sh './gradlew clean build -x test'

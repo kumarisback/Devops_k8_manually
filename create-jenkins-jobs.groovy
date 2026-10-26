@@ -33,6 +33,7 @@ WHAT THIS SCRIPT DOES:
       frontend-pipeline
       order-service-pipeline
       user-service-pipeline
+      notification-service-pipeline
 
 3. Configures each Pipeline to load its Jenkinsfile directly from GitHub.
 
@@ -102,6 +103,13 @@ def jobsToCreate = [
         repoUrl: 'https://github.com/kumarisback/Devops_k8_manually.git',
         branch: '*/main',
         scriptPath: 'user-service/Jenkinsfile'
+    ],
+
+    [
+        name: 'notification-service-pipeline',
+        repoUrl: 'https://github.com/kumarisback/Devops_k8_manually.git',
+        branch: '*/main',
+        scriptPath: 'notification-service/Jenkinsfile'
     ]
 ]
 
