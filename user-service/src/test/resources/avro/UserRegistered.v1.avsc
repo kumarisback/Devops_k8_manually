@@ -1,0 +1,12 @@
+{
+  "type": "record",
+  "name": "UserRegistered",
+  "namespace": "com.example.events.users",
+  "doc": "Someone signed up. Published by user-service to topic users, keyed by userId. Carries no credentials. Change it only backward-compatibly: a new field needs a default.",
+  "fields": [
+    {"name": "eventId", "type": "string", "doc": "Unique per event; a redelivered event keeps it."},
+    {"name": "occurredAt", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "userId", "type": "string"},
+    {"name": "username", "type": "string"}
+  ]
+}
