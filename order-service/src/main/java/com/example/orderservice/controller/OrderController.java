@@ -1,5 +1,7 @@
 package com.example.orderservice.controller;
 
+import com.example.orderservice.dto.CreateOrderRequest;
+import com.example.orderservice.events.OrderEventPublisher;
 import com.example.orderservice.model.Order;
 import com.example.orderservice.repository.OrderRepository;
 import io.opentelemetry.api.GlobalOpenTelemetry;
@@ -7,7 +9,9 @@ import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Scope;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +31,30 @@ public class OrderController {
 
     @Autowired
     private OrderRepository orderRepository;
+
+    @Autowired
+    private OrderEventPublisher eventPublisher;
+
+    // POST /api/orders. The order is saved, then an OrderCreated event goes to
+    // Kafka (where the environment has it) for notification-service.
+    @PostMapping({"", "/"})
+    public ResponseEntity<Order> createOrder(@Valid @RequestBody CreateOrderRequest request) {
+        Span span = tracer.spanBuilder("orders.create").startSpan();
+        try (Scope ignored = span.makeCurrent()) {
+            span.setAttribute("enduser.id", request.userId());
+            Order order = orderRepository.save(new Order(null, request.userId(), request.item(), request.amount(), "CREATED"));
+            span.setAttribute("order.id", order.getId());
+            eventPublisher.orderCreated(order);
+            auditLogger.info("order_created {} {}", kv("enduser.id", order.getUserId()), kv("order.id", order.getId()));
+            return ResponseEntity.status(HttpStatus.CREATED).body(order);
+        } catch (RuntimeException ex) {
+            span.recordException(ex);
+            span.setStatus(StatusCode.ERROR);
+            throw ex;
+        } finally {
+            span.end();
+        }
+    }
 
     @GetMapping("/user/{userId}")
     public ResponseEntity<?> getOrdersByUserId(@PathVariable String userId) {
