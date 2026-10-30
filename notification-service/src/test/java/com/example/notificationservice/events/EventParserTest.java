@@ -24,7 +24,7 @@ class EventParserTest {
     private static final String SCOPE = "event-parser-test";
 
     private final EventParser parser = new EventParser(new NotificationProperties(List.of("orders", "users"),
-            "mock://" + SCOPE, new NotificationProperties.Retry(Duration.ofSeconds(1), 2, 4), 0));
+            "mock://" + SCOPE, new NotificationProperties.Retry(Duration.ofSeconds(1), 2, 4), 0, Duration.ZERO));
 
     @AfterEach
     void dropRegistry() {
@@ -99,7 +99,7 @@ class EventParserTest {
     @Test
     void anUnreachableRegistryIsWorthRetrying() {
         EventParser cut = new EventParser(new NotificationProperties(List.of("orders"), "http://127.0.0.1:1",
-                new NotificationProperties.Retry(Duration.ofSeconds(1), 2, 4), 0));
+                new NotificationProperties.Retry(Duration.ofSeconds(1), 2, 4), 0, Duration.ZERO));
         // Magic byte 0, then a schema ID the parser has never seen: it must ask the registry.
         byte[] value = {0, 0, 0, 0, 42, 2, 'x'};
 

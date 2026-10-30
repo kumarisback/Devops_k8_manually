@@ -27,7 +27,7 @@ class EventListenerTest {
     private final List<IncomingEvent> sent = new ArrayList<>();
     private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
     private final EventParser parser = new EventParser(new NotificationProperties(List.of("users"), "mock://" + SCOPE,
-            new NotificationProperties.Retry(Duration.ofSeconds(1), 2, 4), 0));
+            new NotificationProperties.Retry(Duration.ofSeconds(1), 2, 4), 0, Duration.ZERO));
 
     @AfterEach
     void dropRegistry() {
