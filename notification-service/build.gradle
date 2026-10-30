@@ -27,6 +27,9 @@ dependencies {
 	implementation 'org.springframework.kafka:spring-kafka'
 	// 7.8.x: the line built against kafka-clients 3.8 (Spring Boot 3.4's).
 	implementation 'io.confluent:kafka-avro-serializer:7.8.9'
+	// Amazon MSK's IAM sign-in (roadmap step 14): used only where the
+	// environment points the service at MSK (gitops chart kafka.msk).
+	runtimeOnly 'software.amazon.msk:aws-msk-iam-auth:2.3.9'
 	runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
 	implementation 'net.logstash.logback:logstash-logback-encoder:8.0'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
