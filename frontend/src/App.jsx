@@ -5,11 +5,13 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Login from './components/Login';
 import Signup from './components/Signup';
 import Dashboard from './components/Dashboard';
+import FlagContext from './components/FlagContext';
 import './App.css';
 
 function App() {
   return (
     <AuthProvider>
+      <FlagContext />
       <BrowserRouter>
         <div className="app-layout">
           <Routes>

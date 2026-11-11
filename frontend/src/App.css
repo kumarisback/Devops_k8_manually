@@ -390,6 +390,35 @@ body {
   margin: 0;
 }
 
+/* Task summary (behind the feature flag dashboard-task-summary) */
+.task-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.task-summary-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+}
+
+.task-summary-count {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.task-summary-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
 .btn-refresh {
   background: transparent;
   border: 1px solid var(--border-color);

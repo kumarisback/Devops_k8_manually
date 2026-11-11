@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { useFlag } from '@unleash/proxy-client-react';
 import { useAuth } from '../context/AuthContext';
+import { TASK_SUMMARY_FLAG } from '../lib/flags';
+import TaskSummary from './TaskSummary';
 import { Plus, Trash2, Edit2, LogOut, CheckCircle2, Circle, Clock, Check, X, AlertCircle } from 'lucide-react';
 
 const Dashboard = () => {
     const { user, logout, authFetch } = useAuth();
+    const showSummary = useFlag(TASK_SUMMARY_FLAG);
     const [tasks, setTasks] = useState([]);
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
@@ -259,6 +263,8 @@ const Dashboard = () => {
                             <h2>My Tasks ({tasks.length})</h2>
                             <button onClick={loadTasks} className="btn-refresh">Refresh</button>
                         </div>
+
+                        {showSummary && !loading && <TaskSummary tasks={tasks} />}
 
                         {loading ? (
                             <div className="loader-box">

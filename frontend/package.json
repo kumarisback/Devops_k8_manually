@@ -18,10 +18,12 @@
     "@opentelemetry/resources": "^2.11.0",
     "@opentelemetry/sdk-trace-web": "^2.11.0",
     "@opentelemetry/semantic-conventions": "^1.43.0",
+    "@unleash/proxy-client-react": "^6.0.1",
     "lucide-react": "^1.23.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "react-router-dom": "^7.18.1"
+    "react-router-dom": "^7.18.5",
+    "unleash-proxy-client": "^3.8.2"
   },
   "devDependencies": {
     "@opentelemetry/sdk-trace-base": "^2.11.0",
