@@ -1,6 +1,7 @@
 package com.example.orderservice.outbox;
 
 import com.example.events.orders.OrderCreated;
+import com.example.orderservice.flags.FeatureFlags;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -24,6 +25,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static net.logstash.logback.argument.StructuredArguments.kv;
@@ -43,6 +45,12 @@ import static net.logstash.logback.argument.StructuredArguments.kv;
  * exponential backoff (2s, 4s, ... up to 5 min) and the batch stops:
  * nothing is lost, the outbox just grows until it can be published,
  * which OutboxBacklogGrowing alerts on.
+ *
+ * The kill switch (feature flag order-events-publishing, roadmap step 22)
+ * stops publishing the same way, on purpose and without a deploy: while it
+ * is off, nothing is claimed and events wait in the outbox; switched back
+ * on, they go out in order. If the flag service can't answer, publishing
+ * goes on.
  */
 @Component
 @ConditionalOnProperty(name = "app.events.enabled", havingValue = "true")
@@ -62,12 +70,15 @@ public class OutboxRelay {
     private final Counter failed;
     private final AtomicLong pending = new AtomicLong();
     private final AtomicLong oldestPendingAgeSeconds = new AtomicLong();
+    private final FeatureFlags flags;
+    private final AtomicBoolean publishing = new AtomicBoolean(true);
 
     public OutboxRelay(MongoTemplate mongo, KafkaTemplate<String, Object> kafka,
                        @Value("${app.events.orders-topic}") String topic,
                        @Value("${app.events.outbox.batch-size:100}") int batchSize,
-                       MeterRegistry registry, Clock clock) {
+                       MeterRegistry registry, Clock clock, FeatureFlags flags) {
         this.mongo = mongo;
+        this.flags = flags;
         this.kafka = kafka;
         this.topic = topic;
         this.batchSize = batchSize;
@@ -81,10 +92,20 @@ public class OutboxRelay {
                 .description("Events in the outbox not yet published").register(registry);
         Gauge.builder("outbox.oldest.pending.age.seconds", oldestPendingAgeSeconds, AtomicLong::get)
                 .description("Age of the oldest unpublished event").register(registry);
+        Gauge.builder("order.events.publishing", publishing, p -> p.get() ? 1 : 0)
+                .description("1 while order events are published, 0 while the kill switch holds them").register(registry);
     }
 
     @Scheduled(fixedDelayString = "${app.events.outbox.poll-interval:500ms}")
     public void relay() {
+        boolean on = flags.isEnabled(FeatureFlags.ORDER_EVENTS_PUBLISHING, true);
+        if (publishing.getAndSet(on) != on) {
+            log.warn(on ? "order_events_publishing_resumed {}" : "order_events_publishing_paused {}",
+                    kv("feature_flag", FeatureFlags.ORDER_EVENTS_PUBLISHING));
+        }
+        if (!on) {
+            return;
+        }
         for (int i = 0; i < batchSize; i++) {
             OutboxEvent event = claimNext();
             if (event == null) {

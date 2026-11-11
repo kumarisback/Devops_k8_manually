@@ -1,6 +1,7 @@
 package com.example.orderservice.outbox;
 
 import com.example.events.orders.OrderCreated;
+import com.example.orderservice.flags.FeatureFlags;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -14,6 +15,7 @@ import org.springframework.kafka.support.SendResult;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -35,7 +37,10 @@ class OutboxRelayTest {
     @SuppressWarnings("unchecked")
     private final KafkaTemplate<String, Object> kafka = mock(KafkaTemplate.class);
     private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
-    private final OutboxRelay relay = new OutboxRelay(mongo, kafka, "orders", 10, registry, Clock.fixed(NOW, ZoneOffset.UTC));
+    // Flags as Unleash would answer them; a flag not set here takes its fallback.
+    private final Map<String, Boolean> flagValues = new HashMap<>();
+    private final FeatureFlags flags = (flag, fallback) -> flagValues.getOrDefault(flag, fallback);
+    private final OutboxRelay relay = new OutboxRelay(mongo, kafka, "orders", 10, registry, Clock.fixed(NOW, ZoneOffset.UTC), flags);
 
     private static OutboxEvent pending(String id) {
         Map<String, Object> payload = new LinkedHashMap<>();
@@ -93,4 +98,31 @@ class OutboxRelayTest {
 
         verify(kafka, never()).send(any(), any(), any());
     }
+
+@Test
+void theKillSwitchLeavesEventsInTheOutbox() {
+    flagValues.put(FeatureFlags.ORDER_EVENTS_PUBLISHING, false);
+
+    relay.relay();
+
+    verify(mongo, never()).findAndModify(any(Query.class), any(Update.class), any(FindAndModifyOptions.class), eq(OutboxEvent.class));
+    verify(kafka, never()).send(any(), any(), any());
+    assertThat(registry.get("order.events.publishing").gauge().value()).isZero();
+}
+
+@Test
+void publishingResumesWhenTheKillSwitchIsBackOn() {
+    flagValues.put(FeatureFlags.ORDER_EVENTS_PUBLISHING, false);
+    relay.relay();
+    flagValues.put(FeatureFlags.ORDER_EVENTS_PUBLISHING, true);
+    when(mongo.findAndModify(any(Query.class), any(Update.class), any(FindAndModifyOptions.class), eq(OutboxEvent.class)))
+            .thenReturn(pending("1"), (OutboxEvent) null);
+    CompletableFuture<SendResult<String, Object>> sent = CompletableFuture.completedFuture(null);
+    when(kafka.send(eq("orders"), eq("o-1"), any())).thenReturn(sent);
+
+    relay.relay();
+
+    verify(kafka).send(eq("orders"), eq("o-1"), any());
+    assertThat(registry.get("order.events.publishing").gauge().value()).isEqualTo(1);
+}
 }

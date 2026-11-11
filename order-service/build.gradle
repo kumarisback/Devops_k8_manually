@@ -42,6 +42,9 @@ dependencies {
 	// runtimeOnly 'com.mysql:mysql-connector-j'
 	runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
 	implementation 'net.logstash.logback:logstash-logback-encoder:8.0'
+	// Feature flags (roadmap step 22, gitops docs/FEATURE-FLAGS.md): the
+	// kill switch around order event publishing.
+	implementation 'io.getunleash:unleash-client-java:12.3.2'
 	implementation 'io.opentelemetry:opentelemetry-api'
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
