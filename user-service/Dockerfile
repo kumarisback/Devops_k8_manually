@@ -26,6 +26,9 @@ RUN addgroup -g 1000 spring && adduser -u 1000 -S spring -G spring
 USER 1000:1000
 
 COPY --from=build /app/build/libs/*.jar app.jar
+# The database migrations, as files (migrations/Migrate.java reads them
+# from here; roadmap step 24).
+COPY db/migration /app/db/migration
 
 EXPOSE 8080 8081
 ENTRYPOINT ["java", "-javaagent:/app/opentelemetry-javaagent.jar", "-jar", "app.jar"]

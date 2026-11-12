@@ -22,6 +22,16 @@ pipeline {
             }
         }
 
+        stage('Check migrations') {
+            steps {
+                dir('user-service') {
+                    sh 'chmod +x gradlew'
+                    // The database migrations' rules (roadmap step 24): a
+                    // dangerous migration stops here, not on a database.
+                    sh "./gradlew test --tests 'com.example.demo.migrations.*'"
+                }
+            }
+        }
         stage('Build') {
             steps {
                 dir('user-service') {

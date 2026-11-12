@@ -1,0 +1,6 @@
+{
+  "createIndexes": "tasks",
+  "indexes": [
+    { "key": { "ownerUsername": 1 }, "name": "tasks_by_owner" }
+  ]
+}

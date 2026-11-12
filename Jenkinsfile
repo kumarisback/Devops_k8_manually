@@ -44,6 +44,11 @@ pipeline {
                     } else if (params.SERVICE in ['user-service', 'order-service', 'notification-service']) {
                         dir(params.SERVICE) {
                             sh 'chmod +x gradlew'
+                            if (params.SERVICE == 'user-service') {
+                                // The database migrations' rules (roadmap step 24): a
+                                // dangerous migration stops here, not on a database.
+                                sh "./gradlew test --tests 'com.example.demo.migrations.*'"
+                            }
                             sh './gradlew clean build -x test'
                         }
                     } else if (params.SERVICE == 'kafka-connect') {

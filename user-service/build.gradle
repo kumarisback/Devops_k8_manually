@@ -45,6 +45,18 @@ dependencies {
 	runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
 	implementation 'net.logstash.logback:logstash-logback-encoder:8.0'
 	implementation 'io.opentelemetry:opentelemetry-api'
+	// Database migrations (roadmap step 24, migrations/Migrate.java and
+	// db/migration): Flyway and its MongoDB connector, run as their own
+	// command before a release.
+	implementation 'org.flywaydb:flyway-core:13.12.1'
+	implementation 'org.flywaydb:flyway-database-nc-mongodb:13.12.1'
+	// The connector's commands are plugins of their own.
+	runtimeOnly 'org.flywaydb:flyway-verb-migrate:13.12.1'
+	runtimeOnly 'org.flywaydb:flyway-verb-validate:13.12.1'
+	runtimeOnly 'org.flywaydb:flyway-verb-info:13.12.1'
+	runtimeOnly 'org.flywaydb:flyway-verb-baseline:13.12.1'
+	runtimeOnly 'org.flywaydb:flyway-verb-repair:13.12.1'
+	runtimeOnly 'org.flywaydb:flyway-nc-scanners:13.12.1'
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
 	testImplementation 'org.springframework.security:spring-security-test'
@@ -52,6 +64,15 @@ dependencies {
 	testCompileOnly 'org.projectlombok:lombok'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testAnnotationProcessor 'org.projectlombok:lombok'
+}
+
+dependencyManagement {
+	dependencies {
+		// Flyway 13 (above) uses annotations newer than Spring Boot 3.4's Jackson
+		// 2.18. Annotations only, and compatible upward: the rest of Jackson
+		// stays at Spring Boot's version.
+		dependency 'com.fasterxml.jackson.core:jackson-annotations:2.22'
+	}
 }
 
 tasks.named('test') {

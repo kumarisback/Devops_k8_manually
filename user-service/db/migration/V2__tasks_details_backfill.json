@@ -1,0 +1,10 @@
+{
+  "update": "tasks",
+  "updates": [
+    {
+      "q": { "details": { "$exists": false }, "description": { "$exists": true } },
+      "u": [ { "$set": { "details": "$description" } } ],
+      "multi": true
+    }
+  ]
+}
